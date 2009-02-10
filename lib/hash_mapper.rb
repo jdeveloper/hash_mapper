@@ -86,6 +86,7 @@ module HashMapper
     def get_value_from_input(output, input, path, meth)
       value = path.inject(input) do |h,segment|
         throw :no_value unless h.has_key?(segment.key)
+        puts "getting value: #{segment.value_from(h).inspect}" if meth == :denormalize
         segment.value_from(h)
       end
       value = delegate_to_nested_mapper(value, meth) if delegated_mapper
@@ -103,20 +104,24 @@ module HashMapper
     
     def add_value_to_hash!(hash, path, value)
       path.inject(hash) do |h,segment|
-        if contained?(h,segment)
-          segment.has_index? ? h[segment.key] : add_array_value(h, segment, path, value)
+        if h[segment.key]
+          h[segment.key] = segment.has_index? ? add_array_value(h, segment, path, value) : h[segment.key]
         else
           if !segment.has_index?
-            puts h.inspect
             h[segment.key] = if segment == path.last
               path.apply_filter(value)
               else
                 {}
               end
           else
-            add_array_value h, segment, path, (segment == path.last ? path.apply_filter(value) : {})
+            add_array_value h, segment, path, (segment == path.last ? path.apply_filter(value) : [])
           end
         end
+        #if h[segment.key]
+        #          h[segment.key]
+        #        else
+        #          h[segment.key] = (segment == path.last ? path.apply_filter(value) : {})
+        #        end
       end
     end
     
@@ -131,7 +136,7 @@ module HashMapper
       if segment == path.last
         h[segment.key][segment.index] = value
       end
-      h[segment.key][segment.index]
+      h[segment.key]
     end
   end
   
@@ -161,6 +166,10 @@ module HashMapper
       @segments.last
     end
     
+    def has_key?(k)
+      
+    end
+    
     private
     
     def parse(path)
@@ -175,6 +184,7 @@ module HashMapper
     
     def initialize(str)
       @key, @index  = (str =~ /\[[0-9]+\]$/ ? str.sub(/\[([0-9]+)\]$/,' \1').split(' ') : [str,nil])
+      @index = @index.to_i unless @index.nil?
     end
     
     def key
